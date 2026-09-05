@@ -438,7 +438,7 @@ func (uc *MasterUseCase) registerAutoWash(
 
 	profile := &domain.AutoWash{
 		UserID:               user.ID,
-		Status:               "schedule",
+		Status:               "draft", // Новый профиль неполный, нужна модерация
 		OnlineBookingEnabled: false,
 		Services:             pq.StringArray{},
 		ActivitySubtypeID:    subtypeIDPtr(subtype),
@@ -524,15 +524,39 @@ func (uc *MasterUseCase) registerAutoShop(
 
 	profile := &domain.AutoShop{
 		UserID:               user.ID,
-		Status:               "schedule",
+		Status:               "draft", // Новый профиль неполный, нужна модерация
 		OnlineBookingEnabled: false,
 		Services:             pq.StringArray{},
+		HasPickup:            false,
+		DeliveryAvailable:    false,
+		DeliveryRadiusKm:     0,
+		Brands:               pq.StringArray{},
+		ProductCategories:    pq.StringArray{},
 	}
 	if req.Services != nil {
 		profile.Services = pq.StringArray(*req.Services)
 	}
 	if req.OnlineBookingEnabled != nil {
 		profile.OnlineBookingEnabled = *req.OnlineBookingEnabled
+	}
+	// AutoShop-specific fields
+	if req.HasPickup != nil {
+		profile.HasPickup = *req.HasPickup
+	}
+	if req.DeliveryAvailable != nil {
+		profile.DeliveryAvailable = *req.DeliveryAvailable
+	}
+	if req.DeliveryRadiusKm != nil {
+		profile.DeliveryRadiusKm = *req.DeliveryRadiusKm
+	}
+	if req.ShopType != nil {
+		profile.ShopType = req.ShopType
+	}
+	if req.Brands != nil {
+		profile.Brands = pq.StringArray(req.Brands)
+	}
+	if req.ProductCategories != nil {
+		profile.ProductCategories = pq.StringArray(req.ProductCategories)
 	}
 	if err := uc.autoShopRepo.Create(ctx, profile); err != nil {
 		return nil, apperrors.ErrInternalServer
@@ -597,7 +621,7 @@ func (uc *MasterUseCase) registerAutoService(
 		Description:          req.Description,
 		Address:              req.Address,
 		Coordinates:          req.Coordinates,
-		Status:               "schedule",
+		Status:               "draft", // Новый профиль неполный, нужна модерация
 		OnlineBookingEnabled: false,
 		WorkFrom:             req.WorkFrom,
 		WorkTo:               req.WorkTo,
@@ -1181,6 +1205,25 @@ func (uc *MasterUseCase) UpdateAutoShopProfile(ctx context.Context, userID strin
 	}
 	if req.WorkingDays != nil {
 		profile.WorkingDays = boolDaysToString(req.WorkingDays)
+	}
+	// AutoShop-specific fields
+	if req.HasPickup != nil {
+		profile.HasPickup = *req.HasPickup
+	}
+	if req.DeliveryAvailable != nil {
+		profile.DeliveryAvailable = *req.DeliveryAvailable
+	}
+	if req.DeliveryRadiusKm != nil {
+		profile.DeliveryRadiusKm = *req.DeliveryRadiusKm
+	}
+	if req.ShopType != nil {
+		profile.ShopType = req.ShopType
+	}
+	if req.Brands != nil {
+		profile.Brands = pq.StringArray(req.Brands)
+	}
+	if req.ProductCategories != nil {
+		profile.ProductCategories = pq.StringArray(req.ProductCategories)
 	}
 
 	if err := uc.autoShopRepo.Update(ctx, profile); err != nil {

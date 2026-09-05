@@ -167,6 +167,8 @@ export async function updateStatus(status: MasterStatus) {
 }
 
 export async function fetchAllProfessions(): Promise<string[]> {
+    // Справочник профессий - захардкожено для MVP
+    // TODO: Перейти на API бэкенда когда будет готов endpoint /api/reference/professions
     return [
         "Автоэлектрик",
         "Диагност",
@@ -182,6 +184,8 @@ export async function fetchAllProfessions(): Promise<string[]> {
 export async function fetchAllAutoMarks(): Promise<
     { name: string; internationalName?: string }[]
 > {
+    // Справочник марок автомобилей - захардкожено для MVP
+    // TODO: Перейти на API бэкенда когда будет готов endpoint /api/reference/auto-marks
     return [
         { name: "LADA", internationalName: "lada" },
         { name: "Toyota", internationalName: "toyota" },
@@ -195,7 +199,8 @@ export async function fetchAllAutoMarks(): Promise<
 }
 
 export async function fetchAllServices(): Promise<string[]> {
-    // TODO: Implement backend endpoint
+    // TODO: Implement backend endpoint /api/reference/services
+    // Для MVP возвращаем пустой массив - сервисы вводятся вручную при регистрации
     return [];
 }
 

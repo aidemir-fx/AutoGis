@@ -43,7 +43,7 @@ func TestProfessionalApplicationApproveSetsPrivateExecutorRole(t *testing.T) {
 			IsProfessional: false,
 		},
 	}
-	uc := NewProfessionalApplicationUseCase(repo, userRepo, nil, nil)
+	uc := NewProfessionalApplicationUseCase(repo, userRepo, nil, nil, nil, nil, nil, nil)
 
 	err := uc.Decide(context.Background(), "moderator-1", app.ID, &domain.ProfessionalApplicationDecisionRequest{
 		Decision:          domain.ProfessionalApplicationDecisionApprove,
@@ -96,7 +96,7 @@ func TestProfessionalApplicationApproveRepairsStaleRoleWhenProfessionalFlagAlrea
 			IsProfessional: true,
 		},
 	}
-	uc := NewProfessionalApplicationUseCase(repo, userRepo, nil, nil)
+	uc := NewProfessionalApplicationUseCase(repo, userRepo, nil, nil, nil, nil, nil, nil)
 
 	err := uc.Decide(context.Background(), "moderator-2", app.ID, &domain.ProfessionalApplicationDecisionRequest{
 		Decision:          domain.ProfessionalApplicationDecisionApprove,

@@ -19,6 +19,7 @@ type OrderUseCase struct {
 	activityTypeRepo     repository.ActivityTypeRepository
 	userActivityTypeRepo repository.UserActivityTypeRepository
 	messageRepo          repository.ChatMessageRepository
+	masterRepo           repository.MasterRepository
 }
 
 func NewOrderUseCase(
@@ -27,6 +28,7 @@ func NewOrderUseCase(
 	activityTypeRepo repository.ActivityTypeRepository,
 	userActivityTypeRepo repository.UserActivityTypeRepository,
 	messageRepo repository.ChatMessageRepository,
+	masterRepo repository.MasterRepository,
 ) *OrderUseCase {
 	return &OrderUseCase{
 		orderRepo:            orderRepo,
@@ -34,6 +36,7 @@ func NewOrderUseCase(
 		activityTypeRepo:     activityTypeRepo,
 		userActivityTypeRepo: userActivityTypeRepo,
 		messageRepo:          messageRepo,
+		masterRepo:           masterRepo,
 	}
 }
 
@@ -167,6 +170,12 @@ func (uc *OrderUseCase) GetCustomerOrders(ctx context.Context, customerID string
 }
 
 func (uc *OrderUseCase) GetProviderOrders(ctx context.Context, providerID string) ([]*domain.OrderResponse, error) {
+	// CRM (orders) доступна только для Master, не для AutoWash/AutoShop/AutoService
+	master, err := uc.masterRepo.GetByUserID(ctx, providerID)
+	if err != nil || master == nil {
+		return nil, apperrors.New("FORBIDDEN", "Only Master providers can access orders", 403)
+	}
+
 	orders, err := uc.orderRepo.GetByProviderID(ctx, providerID)
 	if err != nil {
 		return nil, apperrors.ErrInternalServer

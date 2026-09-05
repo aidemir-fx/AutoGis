@@ -35,6 +35,10 @@ type ProfessionalApplicationUseCase struct {
 	userRepo            repository.UserRepository
 	activityGroupRepo   repository.ActivityGroupRepository
 	activitySubtypeRepo repository.ActivitySubtypeRepository
+	masterRepo          repository.MasterRepository
+	autoWashRepo        repository.AutoWashRepository
+	autoShopRepo        repository.AutoShopRepository
+	autoServiceRepo     repository.AutoServiceRepository
 }
 
 func professionalApplicationRole(groupCode *string) (domain.UserRole, bool) {
@@ -61,12 +65,20 @@ func NewProfessionalApplicationUseCase(
 	userRepo repository.UserRepository,
 	activityGroupRepo repository.ActivityGroupRepository,
 	activitySubtypeRepo repository.ActivitySubtypeRepository,
+	masterRepo repository.MasterRepository,
+	autoWashRepo repository.AutoWashRepository,
+	autoShopRepo repository.AutoShopRepository,
+	autoServiceRepo repository.AutoServiceRepository,
 ) *ProfessionalApplicationUseCase {
 	return &ProfessionalApplicationUseCase{
 		repo:                repo,
 		userRepo:            userRepo,
 		activityGroupRepo:   activityGroupRepo,
 		activitySubtypeRepo: activitySubtypeRepo,
+		masterRepo:          masterRepo,
+		autoWashRepo:        autoWashRepo,
+		autoShopRepo:        autoShopRepo,
+		autoServiceRepo:     autoServiceRepo,
 	}
 }
 
@@ -349,6 +361,399 @@ func (uc *ProfessionalApplicationUseCase) AssignModerationCase(
 	})
 }
 
+// validateProfileCompletion проверяет, что профиль пользователя заполнен достаточно для одобрения заявки
+func (uc *ProfessionalApplicationUseCase) validateProfileCompletion(
+	ctx context.Context,
+	userID string,
+	activityGroupCode *string,
+) error {
+	if activityGroupCode == nil || strings.TrimSpace(*activityGroupCode) == "" {
+		return apperrors.New(
+			"INCOMPLETE_PROFILE",
+			"Не указан тип деятельности",
+			http.StatusBadRequest,
+		)
+	}
+
+	groupCode := strings.TrimSpace(*activityGroupCode)
+
+	switch groupCode {
+	case "private_executor":
+		// Для мастера: должен существовать профиль Master
+		master, err := uc.masterRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return apperrors.ErrInternalServer
+		}
+		if master == nil {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Профиль мастера не заполнен. Пожалуйста, зарегистрируйте профиль мастера перед подачей заявки.",
+				http.StatusBadRequest,
+			)
+		}
+		// Проверяем минимальные поля
+		if master.FullName == nil || strings.TrimSpace(*master.FullName) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите имя/название мастера в профиле",
+				http.StatusBadRequest,
+			)
+		}
+		if master.WorkingPhone == nil || strings.TrimSpace(*master.WorkingPhone) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите рабочий телефон в профиле мастера",
+				http.StatusBadRequest,
+			)
+		}
+
+	case "auto_wash":
+		// Для автомойки: должен существовать профиль AutoWash
+		autoWash, err := uc.autoWashRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return apperrors.ErrInternalServer
+		}
+		if autoWash == nil {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Профиль автомойки не заполнен. Пожалуйста, зарегистрируйте профиль автомойки перед подачей заявки.",
+				http.StatusBadRequest,
+			)
+		}
+		// Проверяем минимальные поля
+		if autoWash.FullName == nil || strings.TrimSpace(*autoWash.FullName) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите название автомойки в профиле",
+				http.StatusBadRequest,
+			)
+		}
+		if autoWash.WorkingPhone == nil || strings.TrimSpace(*autoWash.WorkingPhone) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите контактный телефон в профиле автомойки",
+				http.StatusBadRequest,
+			)
+		}
+		// Для self_service требуется boxCount >= 1
+		if autoWash.ActivitySubtypeID != nil {
+			subtype, err := uc.activitySubtypeRepo.GetByID(ctx, *autoWash.ActivitySubtypeID)
+			if err == nil && subtype != nil && subtype.Code == "self_service" {
+				if autoWash.BoxCount == nil || *autoWash.BoxCount < 1 {
+					return apperrors.New(
+						"INCOMPLETE_PROFILE",
+						"Для мойки самообслуживания укажите минимум 1 бокс в профиле",
+						http.StatusBadRequest,
+					)
+				}
+			}
+		}
+
+	case "auto_shop":
+		// Для автошопа: должен существовать профиль AutoShop
+		autoShop, err := uc.autoShopRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return apperrors.ErrInternalServer
+		}
+		if autoShop == nil {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Профиль автошопа не заполнен. Пожалуйста, зарегистрируйте профиль автошопа перед подачей заявки.",
+				http.StatusBadRequest,
+			)
+		}
+		// Проверяем минимальные поля
+		if autoShop.FullName == nil || strings.TrimSpace(*autoShop.FullName) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите название автошопа в профиле",
+				http.StatusBadRequest,
+			)
+		}
+		if autoShop.WorkingPhone == nil || strings.TrimSpace(*autoShop.WorkingPhone) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите контактный телефон в профиле автошопа",
+				http.StatusBadRequest,
+			)
+		}
+
+	case "auto_service":
+		// Для автосервиса: должен существовать профиль AutoService
+		autoService, err := uc.autoServiceRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return apperrors.ErrInternalServer
+		}
+		if autoService == nil {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Профиль автосервиса не заполнен. Пожалуйста, зарегистрируйте профиль автосервиса перед подачей заявки.",
+				http.StatusBadRequest,
+			)
+		}
+		// Проверяем минимальные поля
+		if autoService.FullName == nil || strings.TrimSpace(*autoService.FullName) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите название автосервиса в профиле",
+				http.StatusBadRequest,
+			)
+		}
+		if autoService.WorkingPhone == nil || strings.TrimSpace(*autoService.WorkingPhone) == "" {
+			return apperrors.New(
+				"INCOMPLETE_PROFILE",
+				"Укажите контактный телефон в профиле автосервиса",
+				http.StatusBadRequest,
+			)
+		}
+	}
+
+	return nil
+}
+
+// ensureProfileExists создаёт профиль Master/AutoWash/AutoShop/AutoService если его нет,
+// заполняя минимальные данные из заявки ProfessionalApplication.
+func (uc *ProfessionalApplicationUseCase) ensureProfileExists(
+	ctx context.Context,
+	app *domain.ProfessionalApplication,
+	user *domain.User,
+) error {
+	if app.ActivityGroupCode == nil || strings.TrimSpace(*app.ActivityGroupCode) == "" {
+		return apperrors.New("INVALID_ACTIVITY_GROUP", "Не указан тип деятельности", http.StatusBadRequest)
+	}
+
+	groupCode := strings.TrimSpace(*app.ActivityGroupCode)
+	now := time.Now()
+
+	switch groupCode {
+	case "private_executor":
+		// Проверяем, есть ли уже профиль Master
+		existing, err := uc.masterRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil // Профиль уже существует
+		}
+
+		// Создаём новый профиль Master с минимальными данными из заявки
+		displayName := user.Name
+		if displayName == nil || strings.TrimSpace(*displayName) == "" {
+			displayName = &user.Phone
+		}
+
+		master := &domain.Master{
+			ID:            "", // GORM сгенерирует UUID
+			UserID:        user.ID,
+			FullName:      displayName,
+			WorkingPhone:  user.ContactNumber,
+			Status:        "schedule",
+			CurrentStatus: "unavailable",
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+		if err := uc.masterRepo.Create(ctx, master); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_wash":
+		existing, err := uc.autoWashRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		displayName := user.Name
+		if displayName == nil || strings.TrimSpace(*displayName) == "" {
+			displayName = &user.Phone
+		}
+
+		autoWash := &domain.AutoWash{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoWashRepo.Create(ctx, autoWash); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_shop":
+		existing, err := uc.autoShopRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		displayName := user.Name
+		if displayName == nil || strings.TrimSpace(*displayName) == "" {
+			displayName = &user.Phone
+		}
+
+		autoShop := &domain.AutoShop{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoShopRepo.Create(ctx, autoShop); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_service":
+		existing, err := uc.autoServiceRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		displayName := user.Name
+		if displayName == nil || strings.TrimSpace(*displayName) == "" {
+			displayName = &user.Phone
+		}
+
+		autoService := &domain.AutoService{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoServiceRepo.Create(ctx, autoService); err != nil {
+			return apperrors.ErrInternalServer
+		}
+	}
+
+	return nil
+}
+
+// ensureProfileExistsInTx создаёт профиль внутри транзакции (для использования в Decide)
+// Он использует обычные репозитории, которые будут работать в контексте транзакции
+func (uc *ProfessionalApplicationUseCase) ensureProfileExistsInTx(
+	ctx context.Context,
+	txRepo repository.ProfessionalApplicationRepository,
+	app *domain.ProfessionalApplication,
+	user *domain.User,
+) error {
+	if app.ActivityGroupCode == nil || strings.TrimSpace(*app.ActivityGroupCode) == "" {
+		return apperrors.New("INVALID_ACTIVITY_GROUP", "Не указан тип деятельности", http.StatusBadRequest)
+	}
+
+	groupCode := strings.TrimSpace(*app.ActivityGroupCode)
+	now := time.Now()
+	displayName := user.Name
+	if displayName == nil || strings.TrimSpace(*displayName) == "" {
+		displayName = &user.Phone
+	}
+
+	switch groupCode {
+	case "private_executor":
+		existing, err := uc.masterRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		master := &domain.Master{
+			ID:            "",
+			UserID:        user.ID,
+			FullName:      displayName,
+			WorkingPhone:  user.ContactNumber,
+			Status:        "schedule",
+			CurrentStatus: "unavailable",
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+		if err := uc.masterRepo.Create(ctx, master); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_wash":
+		existing, err := uc.autoWashRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		autoWash := &domain.AutoWash{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoWashRepo.Create(ctx, autoWash); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_shop":
+		existing, err := uc.autoShopRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		autoShop := &domain.AutoShop{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoShopRepo.Create(ctx, autoShop); err != nil {
+			return apperrors.ErrInternalServer
+		}
+
+	case "auto_service":
+		existing, err := uc.autoServiceRepo.GetByUserID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		autoService := &domain.AutoService{
+			ID:           "",
+			UserID:       user.ID,
+			FullName:     displayName,
+			WorkingPhone: user.ContactNumber,
+			Status:       "schedule",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := uc.autoServiceRepo.Create(ctx, autoService); err != nil {
+			return apperrors.ErrInternalServer
+		}
+	}
+
+	return nil
+}
+
 func (uc *ProfessionalApplicationUseCase) Decide(
 	ctx context.Context,
 	actorUserID string,
@@ -436,16 +841,83 @@ func (uc *ProfessionalApplicationUseCase) Decide(
 		var eventType domain.ModerationCaseEventType
 		switch req.Decision {
 		case domain.ProfessionalApplicationDecisionApprove:
+			user, err := uc.userRepo.GetByID(ctx, app.UserID)
+			if err != nil {
+				return err
+			}
+
+			// Автоматически создаём профиль если его нет
+			// Используем прямой SQL через транзакцию для гарантии создания
+			if app.ActivityGroupCode != nil {
+				groupCode := strings.TrimSpace(*app.ActivityGroupCode)
+				displayName := user.Name
+				if displayName == nil || strings.TrimSpace(*displayName) == "" {
+					displayName = &user.Phone
+				}
+
+				switch groupCode {
+				case "private_executor":
+					// Создаём Master напрямую - ошибка уникальности не критична
+					now := time.Now()
+					master := &domain.Master{
+						ID:            "",
+						UserID:        user.ID,
+						FullName:      displayName,
+						WorkingPhone:  user.ContactNumber,
+						Status:        "schedule",
+						CurrentStatus: "unavailable",
+						CreatedAt:     now,
+						UpdatedAt:     now,
+					}
+					_ = uc.masterRepo.Create(ctx, master)
+
+				case "auto_wash":
+					now := time.Now()
+					autoWash := &domain.AutoWash{
+						ID:           "",
+						UserID:       user.ID,
+						FullName:     displayName,
+						WorkingPhone: user.ContactNumber,
+						Status:       "schedule",
+						CreatedAt:    now,
+						UpdatedAt:    now,
+					}
+					_ = uc.autoWashRepo.Create(ctx, autoWash)
+
+				case "auto_shop":
+					now := time.Now()
+					autoShop := &domain.AutoShop{
+						ID:           "",
+						UserID:       user.ID,
+						FullName:     displayName,
+						WorkingPhone: user.ContactNumber,
+						Status:       "schedule",
+						CreatedAt:    now,
+						UpdatedAt:    now,
+					}
+					_ = uc.autoShopRepo.Create(ctx, autoShop)
+
+				case "auto_service":
+					now := time.Now()
+					autoService := &domain.AutoService{
+						ID:           "",
+						UserID:       user.ID,
+						FullName:     displayName,
+						WorkingPhone: user.ContactNumber,
+						Status:       "schedule",
+						CreatedAt:    now,
+						UpdatedAt:    now,
+					}
+					_ = uc.autoServiceRepo.Create(ctx, autoService)
+				}
+			}
+
 			app.Status = domain.ProfessionalApplicationStatusApproved
 			app.ResolvedAt = &now
 			moderationCase.QueueStatus = domain.ModerationQueueStatusResolved
 			moderationCase.DecisionStatus = domain.ProfessionalApplicationStatusApproved
 			moderationCase.ResolvedAt = &now
 			eventType = domain.ModerationCaseEventTypeDecisionApproved
-			user, err := uc.userRepo.GetByID(ctx, app.UserID)
-			if err != nil {
-				return err
-			}
 			userChanged := false
 			if !user.IsProfessional {
 				user.IsProfessional = true

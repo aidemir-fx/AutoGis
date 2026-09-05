@@ -256,22 +256,29 @@ type AdditionalAWService struct {
 
 // AutoShop represents an auto shop
 type AutoShop struct {
-	ID                   string                `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	UserID               string                `gorm:"not null;uniqueIndex" json:"userId"`
-	User                 *User                 `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
-	FullName             *string               `gorm:"type:varchar(255)" json:"fullName,omitempty"`
-	WorkingPhone         *string               `gorm:"type:varchar(20)" json:"workingPhone,omitempty"`
-	Description          *string               `gorm:"type:text" json:"description,omitempty"`
-	Address              *string               `gorm:"type:text" json:"address,omitempty"`
-	Coordinates          *Point                `gorm:"type:jsonb" json:"coordinates,omitempty"`
-	CoverImageURL        *string               `gorm:"type:text" json:"coverImageUrl,omitempty"`
-	CoverImageAssetID    *string               `gorm:"type:uuid" json:"coverImageAssetId,omitempty"`
-	Status               string                `gorm:"type:varchar(20);default:'schedule'" json:"status"`
-	OnlineBookingEnabled bool                  `gorm:"default:false;not null" json:"onlineBookingEnabled"`
-	WorkFrom             *string               `gorm:"type:varchar(5)" json:"workFrom,omitempty"`
-	WorkTo               *string               `gorm:"type:varchar(5)" json:"workTo,omitempty"`
-	WorkingDays          pq.StringArray        `gorm:"type:text[]" json:"workingDays,omitempty"`
-	Services             pq.StringArray        `gorm:"type:text[]" json:"services,omitempty"`
+	ID                   string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	UserID               string         `gorm:"not null;uniqueIndex" json:"userId"`
+	User                 *User          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
+	FullName             *string        `gorm:"type:varchar(255)" json:"fullName,omitempty"`
+	WorkingPhone         *string        `gorm:"type:varchar(20)" json:"workingPhone,omitempty"`
+	Description          *string        `gorm:"type:text" json:"description,omitempty"`
+	Address              *string        `gorm:"type:text" json:"address,omitempty"`
+	Coordinates          *Point         `gorm:"type:jsonb" json:"coordinates,omitempty"`
+	CoverImageURL        *string        `gorm:"type:text" json:"coverImageUrl,omitempty"`
+	CoverImageAssetID    *string        `gorm:"type:uuid" json:"coverImageAssetId,omitempty"`
+	Status               string         `gorm:"type:varchar(20);default:'schedule'" json:"status"`
+	OnlineBookingEnabled bool           `gorm:"default:false;not null" json:"onlineBookingEnabled"`
+	WorkFrom             *string        `gorm:"type:varchar(5)" json:"workFrom,omitempty"`
+	WorkTo               *string        `gorm:"type:varchar(5)" json:"workTo,omitempty"`
+	WorkingDays          pq.StringArray `gorm:"type:text[]" json:"workingDays,omitempty"`
+	Services             pq.StringArray `gorm:"type:text[]" json:"services,omitempty"`
+	// AutoShop-specific fields
+	HasPickup            bool                  `gorm:"default:false;not null" json:"hasPickup"`
+	DeliveryAvailable    bool                  `gorm:"default:false;not null" json:"deliveryAvailable"`
+	DeliveryRadiusKm     int                   `gorm:"default:0" json:"deliveryRadiusKm"`
+	ShopType             *string               `gorm:"type:varchar(50)" json:"shopType,omitempty"` // parts_store, mixed, specialized
+	Brands               pq.StringArray        `gorm:"type:text[]" json:"brands,omitempty"`
+	ProductCategories    pq.StringArray        `gorm:"type:text[]" json:"productCategories,omitempty"`
 	CreatedAt            time.Time             `gorm:"autoCreateTime:milli" json:"createdAt"`
 	UpdatedAt            time.Time             `gorm:"autoUpdateTime:milli" json:"updatedAt"`
 	AdditionalASServices []AdditionalASService `json:"additionalASServices,omitempty"`

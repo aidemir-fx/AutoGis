@@ -157,11 +157,13 @@ func (uc *SearchUseCase) FindCombinedProviders(
 	}
 
 	if activityTypeSet["master"] {
-		masters, err := uc.masterRepo.GetAll(ctx)
+		// Оптимизация: используем GetNearby вместо GetAll + calculateDistance
+		// Это позволяет использовать geo-индекс БД вместо расчётов в памяти
+		masters, err := uc.masterRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm)
 		if err != nil {
 			return nil, apperrors.ErrInternalServer
 		}
-		// Batch-load activity types for all masters in a single query to avoid N+1.
+		// Batch-load activity types for nearby masters to avoid N+1.
 		userIDs := make([]string, 0, len(masters))
 		for _, m := range masters {
 			if m.User != nil {
@@ -176,28 +178,32 @@ func (uc *SearchUseCase) FindCombinedProviders(
 			if master.User == nil {
 				continue
 			}
+			// Пропускаем неполные профили (draft, не schedule)
+			if master.Status != "schedule" {
+				continue
+			}
 			if !isListable(master.FullName, master.User.Name, master.Coordinates, master.User.Coordinates, master.WorkingPhone, master.User.ContactNumber) {
 				continue
 			}
 			distanceMeters, isNearby := uc.calculateDistanceMeters(master.Coordinates, filter.Lat, filter.Lng, filter.RadiusKm)
 			result := uc.masterToSearchResultWithUATs(master, distanceMeters, uatsByUser[master.UserID])
 			addProvider(result, isNearby)
-		}
-
-		if nearbyMasters, err := uc.masterRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm); err == nil {
-			for _, master := range nearbyMasters {
-				nearbyKeys["master:"+master.ID] = struct{}{}
-			}
+			nearbyKeys["master:"+master.ID] = struct{}{}
 		}
 	}
 
 	if activityTypeSet["auto_wash"] {
-		autoWashes, err := uc.autoWashRepo.GetAll(ctx)
+		// Оптимизация: используем GetNearby вместо GetAll + calculateDistance
+		autoWashes, err := uc.autoWashRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm)
 		if err != nil {
 			return nil, apperrors.ErrInternalServer
 		}
 		for _, aw := range autoWashes {
 			if aw.User == nil {
+				continue
+			}
+			// Пропускаем неполные профили (draft, не schedule)
+			if aw.Status != "schedule" {
 				continue
 			}
 			if !isListable(aw.FullName, aw.User.Name, aw.Coordinates, aw.User.Coordinates, aw.WorkingPhone, aw.User.ContactNumber) {
@@ -206,22 +212,22 @@ func (uc *SearchUseCase) FindCombinedProviders(
 			distanceMeters, isNearby := uc.calculateDistanceMeters(aw.Coordinates, filter.Lat, filter.Lng, filter.RadiusKm)
 			result := uc.autoWashToSearchResult(aw, distanceMeters)
 			addProvider(result, isNearby)
-		}
-
-		if nearbyAutoWashes, err := uc.autoWashRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm); err == nil {
-			for _, aw := range nearbyAutoWashes {
-				nearbyKeys["auto_wash:"+aw.ID] = struct{}{}
-			}
+			nearbyKeys["auto_wash:"+aw.ID] = struct{}{}
 		}
 	}
 
 	if activityTypeSet["auto_shop"] {
-		autoShops, err := uc.autoShopRepo.GetAll(ctx)
+		// Оптимизация: используем GetNearby вместо GetAll + calculateDistance
+		autoShops, err := uc.autoShopRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm)
 		if err != nil {
 			return nil, apperrors.ErrInternalServer
 		}
 		for _, shop := range autoShops {
 			if shop.User == nil {
+				continue
+			}
+			// Пропускаем неполные профили (draft, не schedule)
+			if shop.Status != "schedule" {
 				continue
 			}
 			if !isListable(shop.FullName, shop.User.Name, shop.Coordinates, shop.User.Coordinates, shop.WorkingPhone, shop.User.ContactNumber) {
@@ -230,22 +236,22 @@ func (uc *SearchUseCase) FindCombinedProviders(
 			distanceMeters, isNearby := uc.calculateDistanceMeters(shop.Coordinates, filter.Lat, filter.Lng, filter.RadiusKm)
 			result := uc.autoShopToSearchResult(shop, distanceMeters)
 			addProvider(result, isNearby)
-		}
-
-		if nearbyAutoShops, err := uc.autoShopRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm); err == nil {
-			for _, shop := range nearbyAutoShops {
-				nearbyKeys["auto_shop:"+shop.ID] = struct{}{}
-			}
+			nearbyKeys["auto_shop:"+shop.ID] = struct{}{}
 		}
 	}
 
 	if activityTypeSet["auto_service"] {
-		autoServices, err := uc.autoServiceRepo.GetAll(ctx)
+		// Оптимизация: используем GetNearby вместо GetAll + calculateDistance
+		autoServices, err := uc.autoServiceRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm)
 		if err != nil {
 			return nil, apperrors.ErrInternalServer
 		}
 		for _, service := range autoServices {
 			if service.User == nil {
+				continue
+			}
+			// Пропускаем неполные профили (draft, не schedule)
+			if service.Status != "schedule" {
 				continue
 			}
 			if !isListable(service.FullName, service.User.Name, service.Coordinates, service.User.Coordinates, service.WorkingPhone, service.User.ContactNumber) {
@@ -254,12 +260,7 @@ func (uc *SearchUseCase) FindCombinedProviders(
 			distanceMeters, isNearby := uc.calculateDistanceMeters(service.Coordinates, filter.Lat, filter.Lng, filter.RadiusKm)
 			result := uc.autoServiceToSearchResult(service, distanceMeters)
 			addProvider(result, isNearby)
-		}
-
-		if nearbyAutoServices, err := uc.autoServiceRepo.GetNearby(ctx, filter.Lat, filter.Lng, filter.RadiusKm); err == nil {
-			for _, service := range nearbyAutoServices {
-				nearbyKeys["auto_service:"+service.ID] = struct{}{}
-			}
+			nearbyKeys["auto_service:"+service.ID] = struct{}{}
 		}
 	}
 

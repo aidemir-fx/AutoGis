@@ -84,8 +84,8 @@ func main() {
 	// Create use cases
 	authUseCase := usecase.NewAuthUseCase(userRepo, professionalApplicationRepo, jwtService, cfg.JWTAccessExpire, cfg.JWTRefreshExpire)
 	userUseCase := usecase.NewUserUseCase(userRepo, userActivityTypeRepo)
-	orderUseCase := usecase.NewOrderUseCase(orderRepo, userRepo, activityTypeRepo, userActivityTypeRepo, chatMessageRepo)
-	chatUseCase := usecase.NewChatUseCase(orderRepo, userRepo, chatMessageRepo)
+	orderUseCase := usecase.NewOrderUseCase(orderRepo, userRepo, activityTypeRepo, userActivityTypeRepo, chatMessageRepo, masterRepo)
+	chatUseCase := usecase.NewChatUseCase(orderRepo, userRepo, chatMessageRepo, masterRepo)
 	searchUseCase := usecase.NewSearchUseCase(masterRepo, autoWashRepo, autoShopRepo, autoServiceRepo, userActivityTypeRepo, userRepo, activityTypeRepo)
 	activityTypeUseCase := usecase.NewActivityTypeUseCase(activityTypeRepo)
 	reviewUseCase := usecase.NewReviewUseCase(reviewRepo, userRepo, orderRepo, masterRepo)
@@ -99,6 +99,10 @@ func main() {
 		userRepo,
 		activityGroupRepo,
 		activitySubtypeRepo,
+		masterRepo,
+		autoWashRepo,
+		autoShopRepo,
+		autoServiceRepo,
 	)
 	businessApplicationUseCase := usecase.NewBusinessApplicationUseCase(professionalApplicationUseCase)
 	mediaUseCase := usecase.NewMediaUseCase(mediaRepo, orderRepo, s3Client, mediaWorker)

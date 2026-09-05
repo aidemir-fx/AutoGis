@@ -293,15 +293,33 @@ func (uc *MediaUseCase) GetAsset(ctx context.Context, userID, assetID string) (*
 		return nil, apperrors.New("ASSET_NOT_FOUND", "Медиафайл не найден", http.StatusNotFound)
 	}
 
-	if asset.EntityType == domain.MediaEntityObject && asset.CreatedBy != userID {
-		allowedByOrder, err := uc.canAccessOrderPhoto(ctx, asset.ID, userID)
-		if err != nil {
-			return nil, apperrors.ErrInternalServer
+	// Проверяем права доступа в зависимости от типа сущности
+	switch asset.EntityType {
+	case domain.MediaEntityAccount:
+		// Для профилей (account): может смотреть только владелец
+		// EntityID = user_id профиля
+		if asset.EntityID != userID {
+			return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр этого файла", http.StatusForbidden)
 		}
-		if allowedByOrder {
-			return uc.toAssetResponse(asset), nil
+
+	case domain.MediaEntityWork:
+		// Для работ (work): может смотреть только владелец
+		// EntityID = master_id (user_id мастера)
+		if asset.EntityID != userID {
+			return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр этого файла", http.StatusForbidden)
 		}
-		return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр этого файла", http.StatusForbidden)
+
+	case domain.MediaEntityObject:
+		// Для объектов заказов (object): может смотреть владелец или участник заказа
+		if asset.CreatedBy != userID {
+			allowedByOrder, err := uc.canAccessOrderPhoto(ctx, asset.ID, userID)
+			if err != nil {
+				return nil, apperrors.ErrInternalServer
+			}
+			if !allowedByOrder {
+				return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр этого файла", http.StatusForbidden)
+			}
+		}
 	}
 
 	return uc.toAssetResponse(asset), nil
@@ -322,22 +340,50 @@ func (uc *MediaUseCase) GetAssetsByEntity(
 		return nil, apperrors.New("INVALID_ENTITY_TYPE", "Неизвестный тип сущности", http.StatusBadRequest)
 	}
 
+	// Проверяем права доступа в зависимости от типа сущности
+	switch domain.MediaEntityType(entityType) {
+	case domain.MediaEntityAccount:
+		// Для профилей (account): может смотреть только владелец
+		if entityID != userID {
+			return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр файлов этой сущности", http.StatusForbidden)
+		}
+
+	case domain.MediaEntityWork:
+		// Для работ (work): может смотреть только владелец
+		if entityID != userID {
+			return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр файлов этой сущности", http.StatusForbidden)
+		}
+
+	case domain.MediaEntityObject:
+		// Для объектов заказов (object): может смотреть только владелец файлов
+		assets, err := uc.mediaRepo.GetAssetsByEntity(ctx, entityType, entityID)
+		if err != nil {
+			return nil, apperrors.ErrInternalServer
+		}
+
+		if len(assets) > 0 {
+			owned := false
+			for _, a := range assets {
+				if a.CreatedBy == userID {
+					owned = true
+					break
+				}
+			}
+			if !owned {
+				return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр файлов этой сущности", http.StatusForbidden)
+			}
+		}
+
+		resp := make([]*domain.MediaAssetResponse, 0, len(assets))
+		for _, a := range assets {
+			resp = append(resp, uc.toAssetResponse(a))
+		}
+		return &domain.MediaAssetsResponse{Assets: resp}, nil
+	}
+
 	assets, err := uc.mediaRepo.GetAssetsByEntity(ctx, entityType, entityID)
 	if err != nil {
 		return nil, apperrors.ErrInternalServer
-	}
-
-	if domain.MediaEntityType(entityType) == domain.MediaEntityObject && len(assets) > 0 {
-		owned := false
-		for _, a := range assets {
-			if a.CreatedBy == userID {
-				owned = true
-				break
-			}
-		}
-		if !owned {
-			return nil, apperrors.New("FORBIDDEN", "Нет прав на просмотр файлов этой сущности", http.StatusForbidden)
-		}
 	}
 
 	resp := make([]*domain.MediaAssetResponse, 0, len(assets))

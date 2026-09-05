@@ -14,17 +14,20 @@ type ChatUseCase struct {
 	orderRepo   repository.OrderRepository
 	userRepo    repository.UserRepository
 	messageRepo repository.ChatMessageRepository
+	masterRepo  repository.MasterRepository
 }
 
 func NewChatUseCase(
 	orderRepo repository.OrderRepository,
 	userRepo repository.UserRepository,
 	messageRepo repository.ChatMessageRepository,
+	masterRepo repository.MasterRepository,
 ) *ChatUseCase {
 	return &ChatUseCase{
 		orderRepo:   orderRepo,
 		userRepo:    userRepo,
 		messageRepo: messageRepo,
+		masterRepo:  masterRepo,
 	}
 }
 
@@ -57,6 +60,13 @@ func (uc *ChatUseCase) GetOrderForParticipant(ctx context.Context, userID, order
 	}
 	if !isOrderParticipant(order, userID) {
 		return nil, apperrors.ErrUnauthorized
+	}
+	// CRM (chat) доступна только для Master, не для AutoWash/AutoShop/AutoService
+	if order.ProviderID == userID {
+		master, err := uc.masterRepo.GetByUserID(ctx, userID)
+		if err != nil || master == nil {
+			return nil, apperrors.New("FORBIDDEN", "Only Master providers can access chat", 403)
+		}
 	}
 	if order.ChatID == nil {
 		order.ChatID = &order.ID
@@ -206,10 +216,15 @@ func formatNullableOrderTime(t *time.Time) *string {
 func chatMessageToResponse(message *domain.ChatMessage) *domain.ChatMessageResponse {
 	var sender *domain.ChatUserResponse
 	if message.Sender != nil {
+		// Выдаём только рабочий номер (ContactNumber), не auth-phone
+		phone := ""
+		if message.Sender.ContactNumber != nil {
+			phone = *message.Sender.ContactNumber
+		}
 		sender = &domain.ChatUserResponse{
 			ID:    message.Sender.ID,
 			Name:  message.Sender.Name,
-			Phone: message.Sender.Phone,
+			Phone: phone,
 		}
 	}
 

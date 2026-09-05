@@ -65,9 +65,15 @@ func buildUserResponse(user *domain.User) *domain.UserResponse {
 
 	accountType := deriveUserAccountType(user.Role)
 
+	// Выдаём только рабочий номер (ContactNumber), не auth-phone
+	phone := ""
+	if user.ContactNumber != nil {
+		phone = *user.ContactNumber
+	}
+
 	return &domain.UserResponse{
 		ID:              user.ID,
-		Phone:           user.Phone,
+		Phone:           phone,
 		Name:            user.Name,
 		ContactNumber:   user.ContactNumber,
 		Role:            user.Role,

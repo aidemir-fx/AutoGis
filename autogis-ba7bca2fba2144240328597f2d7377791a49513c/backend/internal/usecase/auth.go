@@ -253,8 +253,12 @@ func (uc *UserUseCase) UpdateUser(ctx context.Context, id string, req *domain.Up
 	}
 	// Никогда не меняем Phone (это номер авторизации - логин)
 	// Меняем только ContactNumber (номер для связи в ЛК)
+	// Fallback: если фронт шлёт phone (не contactNumber), сохраняем его в contactNumber
 	if req.ContactNumber != nil {
 		user.ContactNumber = req.ContactNumber
+	} else if req.Phone != nil {
+		// Frontend может отправлять phone вместо contactNumber - это рабочий номер
+		user.ContactNumber = req.Phone
 	}
 	if req.Coordinates != nil {
 		user.Coordinates = req.Coordinates

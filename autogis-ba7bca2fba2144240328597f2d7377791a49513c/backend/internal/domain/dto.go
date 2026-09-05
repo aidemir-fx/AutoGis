@@ -350,7 +350,14 @@ type AutoShopResponse struct {
 	} `json:"additionalServices,omitempty"`
 	ActivityGroup   *ActivityGroupRef   `json:"activityGroup,omitempty"`
 	ActivitySubtype *ActivitySubtypeRef `json:"activitySubtype,omitempty"`
-	CreatedAt       string              `json:"createdAt"`
+	// AutoShop-specific fields
+	HasPickup         bool     `json:"hasPickup"`
+	DeliveryAvailable bool     `json:"deliveryAvailable"`
+	DeliveryRadiusKm  int      `json:"deliveryRadiusKm"`
+	ShopType          *string  `json:"shopType,omitempty"`
+	Brands            []string `json:"brands,omitempty"`
+	ProductCategories []string `json:"productCategories,omitempty"`
+	CreatedAt         string   `json:"createdAt"`
 }
 
 type UpdateAutoShopRequest struct {
@@ -368,6 +375,13 @@ type UpdateAutoShopRequest struct {
 	WorkTo               *string  `json:"workTo,omitempty"`
 	WorkingDays          []bool   `json:"workingDays,omitempty"`
 	AdditionalServices   []string `json:"additionalServices,omitempty"`
+	// AutoShop-specific fields
+	HasPickup         *bool    `json:"hasPickup,omitempty"`
+	DeliveryAvailable *bool    `json:"deliveryAvailable,omitempty"`
+	DeliveryRadiusKm  *int     `json:"deliveryRadiusKm,omitempty" validate:"omitempty,gte=0,lte=500"`
+	ShopType          *string  `json:"shopType,omitempty" validate:"omitempty,oneof=parts_store mixed specialized"`
+	Brands            []string `json:"brands,omitempty"`
+	ProductCategories []string `json:"productCategories,omitempty"`
 }
 
 // AutoService DTOs
@@ -460,6 +474,13 @@ type RegisterActivityRequest struct {
 	WasherCount    *int     `json:"washerCount,omitempty" validate:"omitempty,gte=0,lte=500"`
 	HasWaitingArea *bool    `json:"hasWaitingArea,omitempty"`
 	Payments       []string `json:"payments,omitempty" validate:"omitempty,dive,oneof=cash card qr sbp apple_pay google_pay"`
+	// Auto shop fields
+	HasPickup         *bool    `json:"hasPickup,omitempty"`
+	DeliveryAvailable *bool    `json:"deliveryAvailable,omitempty"`
+	DeliveryRadiusKm  *int     `json:"deliveryRadiusKm,omitempty" validate:"omitempty,gte=0,lte=500"`
+	ShopType          *string  `json:"shopType,omitempty" validate:"omitempty,oneof=parts_store mixed specialized"`
+	Brands            []string `json:"brands,omitempty"`
+	ProductCategories []string `json:"productCategories,omitempty"`
 }
 
 // Activity hierarchy DTOs
